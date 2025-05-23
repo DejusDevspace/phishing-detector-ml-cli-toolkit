@@ -209,7 +209,7 @@ class FeatureExtractor:
                     len(v[0]) for v in query_vars.values() if v
                 ]) if query_vars else 0,
                 'URL_DigitCount': self.count_digits(url),
-                'Directory_DigitCount': self.count_digits(directory_path),
+                # 'Directory_DigitCount': self.count_digits(directory_path),
                 'Extension_DigitCount': self.count_digits(extension),
                 'URL_Letter_Count': self.count_letters(url),
                 'host_letter_count': self.count_letters(full_domain),
