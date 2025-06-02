@@ -99,6 +99,21 @@ class FeatureExtractor:
             return 0
         return len(re.findall(r'[^\w]', s))
 
+    def count_delimiters(self, s: str) -> int:
+        """
+        Count the number of delimiters in the string.
+
+        Parameters:
+        s (str): Input string.
+
+        Returns:
+        int: Number of delimiters.
+        """
+        if not s:
+            return 0
+        delimiters = '/.?\-_&=:@'
+        return sum(s.count(d) for d in delimiters)
+
     def safe_divide(self, numerator: float, denominator: float) -> float:
         """
         Safely divide two numbers, returning 0 if denominator is 0.
@@ -149,8 +164,8 @@ class FeatureExtractor:
         dict: Dictionary of extracted feature names and their values.
         """
         if not url:
-            # Return a dictionary with all features set to 0 for empty URLs
-            return {f'feature_{i}': 0 for i in range(50)}  # Adjust based on actual feature count
+            # Return a dictionary with all features set to appropriate defaults for empty URLs
+            return self._get_default_features()
 
         try:
             parsed = urlparse(url)
@@ -180,10 +195,9 @@ class FeatureExtractor:
             # Calculate directory path
             directory_path = '/'.join(directory_parts) if directory_parts else ''
 
+            # Calculate features with -1 for missing components
             self.url_features = {
-                'Querylength': len(query),
                 'domain_token_count': len(domain_tokens),
-                'path_token_count': len(path_tokens),
                 'avgdomaintokenlen': self.safe_mean([len(t) for t in domain_tokens]),
                 'longdomaintokenlen': self.safe_max([len(t) for t in domain_tokens]),
                 'avgpathtokenlen': self.safe_mean([len(t) for t in path_tokens]),
@@ -205,61 +219,95 @@ class FeatureExtractor:
                     max([len(list(g)) for _, g in groupby(url)]) if url else 0,
                     len(url)
                 ),
-                'LongestVariableValue': self.safe_max([
-                    len(v[0]) for v in query_vars.values() if v
-                ]) if query_vars else 0,
-                'URL_DigitCount': self.count_digits(url),
-                # 'Directory_DigitCount': self.count_digits(directory_path),
-                'Extension_DigitCount': self.count_digits(extension),
+                'Extension_DigitCount': self.count_digits(extension) if extension else -1,
+                'Query_DigitCount': self.count_digits(query) if query else -1,
                 'URL_Letter_Count': self.count_letters(url),
                 'host_letter_count': self.count_letters(full_domain),
-                'Directory_LetterCount': self.count_letters(directory_path),
-                'Filename_LetterCount': self.count_letters(filename),
-                'Extension_LetterCount': self.count_letters(extension),
-                'Query_LetterCount': self.count_letters(query),
+                'Directory_LetterCount': self.count_letters(directory_path) if directory_path else -1,
+                'Filename_LetterCount': self.count_letters(filename) if filename else -1,
+                'Extension_LetterCount': self.count_letters(extension) if extension else -1,
+                'Query_LetterCount': self.count_letters(query) if query else -1,
                 'LongestPathTokenLength': self.safe_max([len(t) for t in path_tokens]),
                 'Domain_LongestWordLength': self.safe_max([len(t) for t in domain_tokens]),
-                'Arguments_LongestWordLength': self.safe_max([len(k) for k in query_vars.keys()]),
+                'Arguments_LongestWordLength': self.safe_max([len(k) for k in query_vars.keys()]) if query_vars else -1,
                 'URLQueries_variable': len(query_vars),
                 'spcharUrl': self.count_special_chars(url),
                 'delimeter_path': sum(path.count(d) for d in '/-=_.:') if path else 0,
+                'delimeter_Count': self.count_delimiters(url) if url else -1,
                 'NumberRate_URL': self.safe_divide(self.count_digits(url), len(url)),
-                'NumberRate_FileName': self.safe_divide(self.count_digits(filename), len(filename)),
-                'NumberRate_Extension': self.safe_divide(self.count_digits(extension), len(extension)),
+                'NumberRate_FileName': self.safe_divide(self.count_digits(filename), len(filename)) if filename else -1,
+                'NumberRate_Extension': self.safe_divide(self.count_digits(extension), len(extension)) if extension else -1,
                 'NumberRate_AfterPath': self.safe_divide(
                     self.count_digits(parsed.fragment or ''),
                     len(parsed.fragment or '')
-                ),
+                ) if parsed.fragment else -1,
                 'SymbolCount_URL': self.count_symbols(url),
                 'SymbolCount_Domain': self.count_symbols(full_domain),
-                'SymbolCount_Directoryname': self.count_symbols(directory_path),
-                'SymbolCount_FileName': self.count_symbols(filename),
-                'SymbolCount_Extension': self.count_symbols(extension),
+                'SymbolCount_Directoryname': self.count_symbols(directory_path) if directory_path else -1,
+                'SymbolCount_FileName': self.count_symbols(filename) if filename else -1,
+                'SymbolCount_Extension': self.count_symbols(extension) if extension else -1,
                 'Entropy_Domain': self.calculate_entropy(full_domain),
-                'Entropy_DirectoryName': self.calculate_entropy(directory_path)
+                'Entropy_Filename': self.calculate_entropy(filename) if filename else -1
             }
 
             return self.url_features
 
         except Exception as e:
-            # In case of any error, return a dictionary with all features set to 0
+            # In case of any error, return a dictionary with all features set to appropriate defaults
             print(f"Error extracting features from URL '{url}': {e}")
-            # You might want to define the exact number of features here
-            default_features = {
-                'Querylength': 0, 'domain_token_count': 0, 'path_token_count': 0,
-                'avgdomaintokenlen': 0, 'longdomaintokenlen': 0, 'avgpathtokenlen': 0,
-                'tld': 0, 'ldl_url': 0, 'ldl_path': 0, 'urlLen': 0, 'domainlength': 0,
-                'pathLength': 0, 'subDirLen': 0, 'pathurlRatio': 0, 'ArgUrlRatio': 0,
-                'argDomanRatio': 0, 'domainUrlRatio': 0, 'pathDomainRatio': 0,
-                'argPathRatio': 0, 'NumberofDotsinURL': 0, 'CharacterContinuityRate': 0,
-                'LongestVariableValue': 0, 'URL_DigitCount': 0, 'Directory_DigitCount': 0,
-                'Extension_DigitCount': 0, 'URL_Letter_Count': 0, 'host_letter_count': 0,
-                'Directory_LetterCount': 0, 'Filename_LetterCount': 0, 'Extension_LetterCount': 0,
-                'Query_LetterCount': 0, 'LongestPathTokenLength': 0, 'Domain_LongestWordLength': 0,
-                'Arguments_LongestWordLength': 0, 'URLQueries_variable': 0, 'spcharUrl': 0,
-                'delimeter_path': 0, 'NumberRate_URL': 0, 'NumberRate_FileName': 0,
-                'NumberRate_Extension': 0, 'NumberRate_AfterPath': 0, 'SymbolCount_URL': 0,
-                'SymbolCount_Domain': 0, 'SymbolCount_Directoryname': 0, 'SymbolCount_FileName': 0,
-                'SymbolCount_Extension': 0, 'Entropy_Domain': 0, 'Entropy_DirectoryName': 0
-            }
-            return default_features
+            return self._get_default_features()
+
+    def _get_default_features(self) -> dict:
+        """
+        Get default feature values for error cases or empty URLs.
+
+        Returns:
+        dict: Dictionary with default feature values.
+        """
+        return {
+            'domain_token_count': 0,
+            'avgdomaintokenlen': 0,
+            'longdomaintokenlen': 0,
+            'avgpathtokenlen': 0,
+            'tld': 0,
+            'ldl_url': 0,
+            'ldl_path': 0,
+            'urlLen': 0,
+            'domainlength': 0,
+            'pathLength': 0,
+            'subDirLen': 0,
+            'pathurlRatio': 0,
+            'ArgUrlRatio': 0,
+            'argDomanRatio': 0,
+            'domainUrlRatio': 0,
+            'pathDomainRatio': 0,
+            'argPathRatio': 0,
+            'NumberofDotsinURL': 0,
+            'CharacterContinuityRate': 0,
+            'Extension_DigitCount': -1,
+            'Query_DigitCount': -1,
+            'URL_Letter_Count': 0,
+            'host_letter_count': 0,
+            'Directory_LetterCount': -1,
+            'Filename_LetterCount': -1,
+            'Extension_LetterCount': -1,
+            'Query_LetterCount': -1,
+            'LongestPathTokenLength': 0,
+            'Domain_LongestWordLength': 0,
+            'Arguments_LongestWordLength': -1,
+            'URLQueries_variable': 0,
+            'spcharUrl': 0,
+            'delimeter_path': 0,
+            'delimeter_Count': -1,
+            'NumberRate_URL': 0,
+            'NumberRate_FileName': -1,
+            'NumberRate_Extension': -1,
+            'NumberRate_AfterPath': -1,
+            'SymbolCount_URL': 0,
+            'SymbolCount_Domain': 0,
+            'SymbolCount_Directoryname': -1,
+            'SymbolCount_FileName': -1,
+            'SymbolCount_Extension': -1,
+            'Entropy_Domain': 0,
+            'Entropy_Filename': -1
+        }

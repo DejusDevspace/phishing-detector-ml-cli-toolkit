@@ -255,22 +255,22 @@ def main():
         description="Malicious URL Detector CLI Tool - Multi-class Classification",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Classes detected:
-  - BENIGN: Safe/legitimate websites
-  - PHISHING: Phishing websites
-  - MALWARE: Malware distribution sites
-  - SPAM: Spam-related websites
-  - DEFACEMENT: Defaced websites
+        Classes detected:
+            - BENIGN: Safe/legitimate websites
+            - PHISHING: Phishing websites
+            - MALWARE: Malware distribution sites
+            - SPAM: Spam-related websites
+            - DEFACEMENT: Defaced websites
 
-Examples:
-  Single URL prediction:
-    python malicious_url_detector.py --model model.pkl --url "https://suspicious-site.com"
+        Examples:
+            Single URL prediction:
+                python malicious_url_detector.py --model model.pkl --url "https://suspicious-site.com"
 
-  Batch prediction from file:
-    python malicious_url_detector.py --model model.pkl --batch urls.txt
+            Batch prediction from file:
+                python malicious_url_detector.py --model model.pkl --batch urls.txt
 
-  Interactive mode:
-    python malicious_url_detector.py --model model.pkl --interactive
+            Interactive mode:
+                python malicious_url_detector.py --model model.pkl --interactive
         """
     )
 
