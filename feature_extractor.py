@@ -151,7 +151,7 @@ class FeatureExtractor:
         Returns:
         float: Mean value or default.
         """
-        return np.mean(items) if items else default
+        return float(np.mean(items)) if items else default
 
     def extract_features(self, url: str) -> dict:
         """
@@ -181,12 +181,12 @@ class FeatureExtractor:
             path_tokens = self.tokenize(path)
             query_vars = parse_qs(query) if query else {}
 
-            # Handle path splitting more safely
+            # Handle path splitting safely
             path_parts = path.split('/') if path else ['']
             directory_parts = path_parts[:-1] if len(path_parts) > 1 else []
             filename = path_parts[-1] if path_parts else ''
 
-            # Handle file extension more safely
+            # Handle file extension safely
             if filename and '.' in filename:
                 extension = filename.split('.')[-1]
             else:
@@ -195,7 +195,8 @@ class FeatureExtractor:
             # Calculate directory path
             directory_path = '/'.join(directory_parts) if directory_parts else ''
 
-            # Calculate features with -1 for missing components
+            # Extract the features
+            # Return -1 for missing features with missing components
             self.url_features = {
                 'domain_token_count': len(domain_tokens),
                 'avgdomaintokenlen': self.safe_mean([len(t) for t in domain_tokens]),
