@@ -114,7 +114,7 @@ class MaliciousURLDetector:
         try:
             # Make prediction
             prediction = self.model.predict(features)[0]
-            print("Output", self.model.predict(features))
+            # print("Output", self.model.predict(features))
 
             # Get prediction probabilities if available
             if hasattr(self.model, 'predict_proba'):
