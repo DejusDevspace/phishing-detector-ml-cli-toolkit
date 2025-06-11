@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Malicious URL Detector CLI Tool
+Phishing URL Detector CLI Tool
 
-A command-line interface for detecting malicious URLs using a pre-trained machine learning model.
-Supports multi-class classification: Defacement, Benign, Malware, Phishing, and Spam.
+A command-line interface for detecting phishing URLs using a pre-trained machine learning model.
+Supports binary classification: Phishing and Benign.
 Leverages the FeatureExtractor class to extract URL features and make predictions.
 
 Usage:
@@ -24,7 +24,7 @@ import numpy as np
 from feature_extractor import FeatureExtractor
 
 
-class MaliciousURLDetector:
+class PhishingURLDetector:
     """
     Main class for the phishing detection CLI tool.
     """
@@ -38,7 +38,29 @@ class MaliciousURLDetector:
         """
         self.feature_extractor = FeatureExtractor()
         self.model = self.load_model(model_path)
-        self.feature_names = None
+        self.feature_names = self._get_expected_feature_names()
+
+    def _get_expected_feature_names(self) -> List[str]:
+        """
+        Get the expected feature names in the correct order for the model.
+
+        Returns:
+        List[str]: List of feature names matching the dataset.
+        """
+        return [
+            'url_length', 'number_of_dots_in_url', 'having_repeated_digits_in_url',
+            'number_of_digits_in_url', 'number_of_special_char_in_url',
+            'number_of_hyphens_in_url', 'number_of_underline_in_url',
+            'number_of_slash_in_url', 'number_of_questionmark_in_url',
+            'number_of_equal_in_url', 'number_of_percent_in_url', 'domain_length',
+            'number_of_dots_in_domain', 'number_of_hyphens_in_domain',
+            'having_special_characters_in_domain', 'number_of_special_characters_in_domain',
+            'having_digits_in_domain', 'number_of_digits_in_domain',
+            'having_repeated_digits_in_domain', 'number_of_subdomains',
+            'average_subdomain_length', 'number_of_special_characters_in_subdomain',
+            'having_digits_in_subdomain', 'number_of_digits_in_subdomain',
+            'path_length', 'having_query', 'entropy_of_url', 'entropy_of_domain'
+        ]
 
     def load_model(self, model_path: str):
         """
@@ -75,11 +97,7 @@ class MaliciousURLDetector:
         try:
             features_dict = self.feature_extractor.extract_features(url)
 
-            # Store feature names for the first extraction (for consistency)
-            if self.feature_names is None:
-                self.feature_names = list(features_dict.keys())
-
-            # Convert to vector maintaining feature order
+            # Convert to vector maintaining the expected feature order
             feature_vector = np.array([features_dict[name] for name in self.feature_names])
             return feature_vector.reshape(1, -1)
 
@@ -87,12 +105,13 @@ class MaliciousURLDetector:
             print(f"✗ Error extracting features from URL '{url}': {e}")
             return None
 
-    def predict_single_url(self, url: str) -> Tuple[str, float]:
+    def predict_single_url(self, url: str, show_features: bool = False) -> Tuple[str, float]:
         """
         Make a prediction for a single URL.
 
         Parameters:
         url (str): URL to analyze.
+        show_features (bool): Whether to display extracted features.
 
         Returns:
         Tuple[str, float]: Prediction label and confidence score.
@@ -102,19 +121,23 @@ class MaliciousURLDetector:
         if features is None:
             return "ERROR", 0.0
 
-        # Class mapping
+        # Show features if requested (useful for debugging)
+        if show_features:
+            features_dict = self.feature_extractor.extract_features(url)
+            print(f"\n📊 Extracted features for: {url}")
+            for feature, value in features_dict.items():
+                print(f"  {feature}: {value}")
+            print("-" * 60)
+
+        # Class mapping (0 = Benign, 1 = Phishing)
         class_labels = {
-            0: "DEFACEMENT",
-            1: "BENIGN",
-            2: "MALWARE",
-            3: "PHISHING",
-            4: "SPAM"
+            0: "BENIGN",
+            1: "PHISHING"
         }
 
         try:
             # Make prediction
             prediction = self.model.predict(features)[0]
-            # print("Output", self.model.predict(features))
 
             # Get prediction probabilities if available
             if hasattr(self.model, 'predict_proba'):
@@ -161,57 +184,117 @@ class MaliciousURLDetector:
         # Color codes for terminal output
         RED = '\033[91m'
         GREEN = '\033[92m'
-        YELLOW = '\033[93m'
         BLUE = '\033[94m'
-        MAGENTA = '\033[95m'
         RESET = '\033[0m'
 
         # Choose color and icon based on prediction
         if prediction == "BENIGN":
             color = GREEN
-            icon = "✓"
+            icon = "✅"
+            status = "SAFE"
         elif prediction == "PHISHING":
             color = RED
             icon = "🎣"
-        elif prediction == "MALWARE":
-            color = RED
-            icon = "🦠"
-        elif prediction == "SPAM":
-            color = YELLOW
-            icon = "📧"
-        elif prediction == "DEFACEMENT":
-            color = MAGENTA
-            icon = "🔧"
+            status = "SUSPICIOUS"
         else:
             color = BLUE
             icon = "❓"
+            status = "UNKNOWN"
 
         print(f"\n{icon} URL: {url}")
-        print(f"{color}Prediction: {prediction}{RESET}")
+        print(f"{color}Prediction: {prediction} ({status}){RESET}")
         print(f"Confidence: {confidence:.2%}")
-        print("-" * 60)
+        print("-" * 80)
+
+    def compare_urls(self, url1: str, url2: str) -> None:
+        """
+        Compare predictions for two URLs and show feature differences.
+        Useful for debugging issues like the trailing slash problem.
+
+        Parameters:
+        url1 (str): First URL to compare.
+        url2 (str): Second URL to compare.
+        """
+        print(f"\n🔍 Comparing URLs:")
+        print(f"URL 1: {url1}")
+        print(f"URL 2: {url2}")
+        print("-" * 80)
+
+        # Get predictions
+        pred1, conf1 = self.predict_single_url(url1)
+        pred2, conf2 = self.predict_single_url(url2)
+
+        # Get features
+        features1 = self.feature_extractor.extract_features(url1)
+        features2 = self.feature_extractor.extract_features(url2)
+
+        print(f"\nPredictions:")
+        print(f"URL 1: {pred1} ({conf1:.2%})")
+        print(f"URL 2: {pred2} ({conf2:.2%})")
+
+        # Show feature differences
+        print(f"\nFeature Differences:")
+        differences = []
+        for feature in self.feature_names:
+            val1 = features1[feature]
+            val2 = features2[feature]
+            if val1 != val2:
+                differences.append((feature, val1, val2))
+                print(f"  {feature}: {val1} vs {val2}")
+
+        if not differences:
+            print("  No feature differences found!")
+        else:
+            print(f"\nFound {len(differences)} different features.")
 
     def interactive_mode(self):
         """
         Run the detector in interactive mode, allowing users to input URLs one at a time.
         """
-        print("\n🔍 Malicious URL Detector - Interactive Mode")
-        print("Enter URLs to analyze (type 'quit' or 'exit' to stop):")
-        print("Classes: BENIGN, PHISHING, MALWARE, SPAM, DEFACEMENT")
-        print("-" * 60)
+        print("\n🎣 Phishing URL Detector - Interactive Mode")
+        print("Enter URLs to analyze (type 'quit', 'exit', or 'q' to stop):")
+        print("Special commands:")
+        print("  'compare <url1> <url2>' - Compare two URLs")
+        print("  'features <url>' - Show extracted features")
+        print("Classes: BENIGN (safe), PHISHING (suspicious)")
+        print("-" * 80)
 
         while True:
             try:
-                url = input("\nEnter URL: ").strip()
+                user_input = input("\nEnter command or URL: ").strip()
 
-                if url.lower() in ['quit', 'exit', 'q']:
+                if user_input.lower() in ['quit', 'exit', 'q']:
                     print("Goodbye!")
                     break
 
-                if not url:
+                if not user_input:
                     continue
 
-                # Add protocol if missing
+                # Handle special commands
+                if user_input.startswith('compare '):
+                    parts = user_input[8:].split()
+                    if len(parts) >= 2:
+                        url1, url2 = parts[0], parts[1]
+                        # Add protocol if missing
+                        if not url1.startswith(('http://', 'https://')):
+                            url1 = 'https://' + url1
+                        if not url2.startswith(('http://', 'https://')):
+                            url2 = 'https://' + url2
+                        self.compare_urls(url1, url2)
+                    else:
+                        print("Usage: compare <url1> <url2>")
+                    continue
+
+                if user_input.startswith('features '):
+                    url = user_input[9:].strip()
+                    if not url.startswith(('http://', 'https://')):
+                        url = 'https://' + url
+                    prediction, confidence = self.predict_single_url(url, show_features=True)
+                    self.format_prediction_output(url, prediction, confidence)
+                    continue
+
+                # Regular URL prediction
+                url = user_input
                 if not url.startswith(('http://', 'https://')):
                     url = 'https://' + url
 
@@ -252,25 +335,25 @@ def main():
     Main function to handle command-line arguments and run the detector.
     """
     parser = argparse.ArgumentParser(
-        description="Malicious URL Detector CLI Tool - Multi-class Classification",
+        description="Phishing URL Detector CLI Tool - Binary Classification",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
         Classes detected:
             - BENIGN: Safe/legitimate websites
-            - PHISHING: Phishing websites
-            - MALWARE: Malware distribution sites
-            - SPAM: Spam-related websites
-            - DEFACEMENT: Defaced websites
+            - PHISHING: Suspicious/phishing websites
 
         Examples:
             Single URL prediction:
-                python malicious_url_detector.py --model model.pkl --url "https://suspicious-site.com"
+                python url_detector.py --model model.pkl --url "https://suspicious-site.com"
+
+            Compare two URLs (useful for debugging):
+                python url_detector.py --model model.pkl --compare "https://google.com" "https://google.com/"
 
             Batch prediction from file:
-                python malicious_url_detector.py --model model.pkl --batch urls.txt
+                python url_detector.py --model model.pkl --batch urls.txt
 
             Interactive mode:
-                python malicious_url_detector.py --model model.pkl --interactive
+                python url_detector.py --model model.pkl --interactive
         """
     )
 
@@ -294,6 +377,12 @@ def main():
         action='store_true',
         help='Run in interactive mode'
     )
+    group.add_argument(
+        '--compare', '-c',
+        nargs=2,
+        metavar=('URL1', 'URL2'),
+        help='Compare two URLs and show feature differences'
+    )
 
     parser.add_argument(
         '--output', '-o',
@@ -306,14 +395,29 @@ def main():
         help='Enable verbose output'
     )
 
+    parser.add_argument(
+        '--features', '-f',
+        action='store_true',
+        help='Show extracted features (for debugging)'
+    )
+
     args = parser.parse_args()
 
     # Initialize the detector
-    detector = MaliciousURLDetector(args.model)
+    detector = PhishingURLDetector(args.model)
 
     if args.interactive:
         # Interactive mode
         detector.interactive_mode()
+
+    elif args.compare:
+        # Compare two URLs
+        url1, url2 = args.compare
+        if not url1.startswith(('http://', 'https://')):
+            url1 = 'https://' + url1
+        if not url2.startswith(('http://', 'https://')):
+            url2 = 'https://' + url2
+        detector.compare_urls(url1, url2)
 
     elif args.url:
         # Single URL prediction
@@ -321,7 +425,7 @@ def main():
         if not url.startswith(('http://', 'https://')):
             url = 'https://' + url
 
-        prediction, confidence = detector.predict_single_url(url)
+        prediction, confidence = detector.predict_single_url(url, show_features=args.features)
         detector.format_prediction_output(url, prediction, confidence)
 
     elif args.batch:
@@ -338,19 +442,8 @@ def main():
             if args.verbose:
                 detector.format_prediction_output(url, prediction, confidence)
             else:
-                # Compact output for batch mode with appropriate icons
-                if prediction == "BENIGN":
-                    icon = "✓"
-                elif prediction == "PHISHING":
-                    icon = "🎣"
-                elif prediction == "MALWARE":
-                    icon = "🦠"
-                elif prediction == "SPAM":
-                    icon = "📧"
-                elif prediction == "DEFACEMENT":
-                    icon = "🔧"
-                else:
-                    icon = "❓"
+                # Compact output for batch mode
+                icon = "✅" if prediction == "BENIGN" else "🎣"
                 print(f"{icon} {url} -> {prediction} ({confidence:.2%})")
 
         # Save to CSV if requested
@@ -359,17 +452,15 @@ def main():
             df.to_csv(args.output, index=False)
             print(f"\n💾 Results saved to {args.output}")
 
-        # Summary with all classes
+        # Summary
         total = len(results)
-        class_counts = {}
-        for _, prediction, _ in results:
-            class_counts[prediction] = class_counts.get(prediction, 0) + 1
+        benign_count = sum(1 for _, pred, _ in results if pred == "BENIGN")
+        phishing_count = sum(1 for _, pred, _ in results if pred == "PHISHING")
 
         print(f"\n📊 Summary:")
         print(f"Total URLs: {total}")
-        for class_name, count in sorted(class_counts.items()):
-            percentage = count / total * 100
-            print(f"{class_name}: {count} ({percentage:.1%})")
+        print(f"BENIGN: {benign_count} ({benign_count/total:.1%})")
+        print(f"PHISHING: {phishing_count} ({phishing_count/total:.1%})")
 
 
 if __name__ == "__main__":

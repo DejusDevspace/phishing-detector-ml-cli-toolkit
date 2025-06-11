@@ -3,3 +3,4 @@ encoders/
 __pycache__
 models/
 notes.txt
+test.ipynb
