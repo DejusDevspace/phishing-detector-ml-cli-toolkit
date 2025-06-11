@@ -245,7 +245,7 @@ class FeatureExtractor:
 if __name__ == "__main__":
     extractor = FeatureExtractor()
 
-    # Test with example URLs
+    # Testing extractor with example URLs
     test_urls = [
         "https://www.google.com",
         "http://phishing-site123.fake-bank.com/login.php?user=123&pass=456",
